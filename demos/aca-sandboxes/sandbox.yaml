@@ -1,0 +1,36 @@
+disk: ubuntu
+resources:
+  cpu: 1000m
+  memory: 2048Mi
+lifecycle:
+  autoSuspendPolicy:
+    enabled: true
+    interval: 300
+    mode: Memory          # full memory+disk snapshot on suspend
+  autoDeletePolicy:
+    enabled: true
+    deleteIntervalInSeconds: 86400   # clean up after 24h
+egressPolicy:
+  defaultAction: Deny
+  hostRules:
+    - pattern: "pypi.org"
+      action: Allow
+    - pattern: "files.pythonhosted.org"
+      action: Allow
+    - pattern: "*.github.com"
+      action: Allow
+    - pattern: "raw.githubusercontent.com"
+      action: Allow
+  rules:
+    # Inject the OpenAI key — sandbox code never touches credentials directly
+    - name: inject-openai-key
+      match:
+        host: "api.openai.com"
+        path: "/v1/*"
+        methods: [POST, GET]
+      action:
+        type: Transform
+        headers:
+          - operation: Set
+            name: Authorization
+            value: "Bearer {openai-api-key}"   # resolved from sandbox group secrets
