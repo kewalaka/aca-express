@@ -48,8 +48,8 @@ info() { echo -e "${DIM}   $1${RESET}"; }
 warn() { echo -e "${YELLOW}⚠  $1${RESET}"; }
 
 run() {
-  # Print the command, then execute it
-  echo -e "${DIM}$ $*${RESET}"
+  # Print the command to stderr so it doesn't pollute stdout captures
+  echo -e "${DIM}$ $*${RESET}" >&2
   "$@"
 }
 
@@ -130,7 +130,7 @@ compare \
 step "Create a fresh sandbox from Ubuntu"
 SANDBOX_ID=$(run aca sandbox apply --file "$(dirname "$0")/sandbox.yaml" -o json | \
   python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || \
-  aca sandbox create --disk ubuntu -o json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))")
+  aca sandbox create --disk ubuntu -o json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null)
 
 # Fallback: grab ID from plain text output if JSON parse failed
 if [[ -z "$SANDBOX_ID" ]]; then
@@ -242,7 +242,7 @@ pause
 step "Rollback: create a new sandbox from the checkpoint"
 info "In production you'd delete the rogue sandbox and restore the checkpoint."
 RESTORED_ID=$(aca sandbox create --snapshot "$SNAP_WORK" -o json 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" || \
+  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null || \
   aca sandbox create --snapshot "$SNAP_WORK" 2>&1 | grep -oE '[0-9a-f-]{36}' | head -1)
 
 ok "Restored sandbox: $RESTORED_ID"
