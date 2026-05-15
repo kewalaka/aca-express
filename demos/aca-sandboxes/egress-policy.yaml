@@ -1,0 +1,40 @@
+defaultAction: Deny
+
+# Allow only what the agent genuinely needs
+hostRules:
+  - pattern: "pypi.org"
+    action: Allow
+  - pattern: "files.pythonhosted.org"
+    action: Allow
+  - pattern: "*.github.com"
+    action: Allow
+  - pattern: "raw.githubusercontent.com"
+    action: Allow
+
+rules:
+  # Transparent credential injection — agent code has NO API key
+  # The platform attaches the Authorization header automatically
+  - name: inject-openai-key
+    match:
+      host: "api.openai.com"
+      path: "/v1/*"
+      methods: [POST, GET]
+    action:
+      type: Transform
+      headers:
+        - operation: Set
+          name: Authorization
+          value: "Bearer {openai-api-key}"   # pulled from sandbox group secrets store
+
+  # Block the common exfil destinations explicitly for clarity in demos
+  - name: block-pastebin
+    match:
+      host: "pastebin.com"
+    action:
+      type: Deny
+
+  - name: block-requestbin
+    match:
+      host: "*.requestbin.com"
+    action:
+      type: Deny

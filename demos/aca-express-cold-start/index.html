@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ACA Express — Cold Start Dashboard</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --azure:     #0078d4;
+      --azure-hover: #106ebe;
+      --azure-light: #50a0e8;
+      --green:     #3fb950;
+      --orange:    #f0883e;
+      --red:       #f85149;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --warm:      #3fb950;
+      --cold:      #0078d4;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header .badge {
+      display: inline-block;
+      background: var(--azure);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* URL input row */
+    .url-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: stretch;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.65rem 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--azure);
+      box-shadow: 0 0 0 3px rgba(0,120,212,0.2);
+    }
+
+    /* Buttons */
+    .btn {
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.65rem 1.4rem;
+      transition: background 0.15s, transform 0.1s, opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--azure);
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--azure-hover); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--azure-light);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+    /* Timer hero */
+    .timer-wrap {
+      text-align: center;
+      padding: 1rem 0 0.5rem;
+    }
+
+    .timer-value {
+      font-size: 5rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s;
+    }
+
+    .timer-value.idle   { color: var(--muted); }
+    .timer-value.running { color: var(--azure-light); }
+    .timer-value.done-cold { color: var(--azure-light); }
+    .timer-value.done-warm { color: var(--warm); }
+
+    .timer-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.35rem 0.9rem;
+      border-radius: 20px;
+      margin-top: 0.75rem;
+    }
+
+    .status-pill.hidden   { visibility: hidden; }
+    .status-pill.cold     { background: rgba(0,120,212,0.15); color: var(--azure-light); border: 1px solid rgba(0,120,212,0.35); }
+    .status-pill.warm     { background: rgba(63,185,80,0.12); color: var(--warm); border: 1px solid rgba(63,185,80,0.3); }
+    .status-pill.loading  { background: rgba(240,136,62,0.12); color: var(--orange); border: 1px solid rgba(240,136,62,0.3); }
+
+    /* Breakdown grid */
+    .breakdown {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .breakdown-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      text-align: center;
+    }
+
+    .breakdown-item .val {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+
+    .breakdown-item .lbl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Server details */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .detail-item .dk { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+    .detail-item .dv { font-size: 0.9rem; color: var(--text); font-weight: 500; word-break: break-all; }
+
+    /* History */
+    .history-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+      gap: 0.5rem;
+    }
+
+    .history-item .h-time { color: var(--muted); min-width: 60px; }
+    .history-item .h-type { flex: 1; }
+    .history-item .h-ms {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 70px;
+      text-align: right;
+    }
+
+    .history-item.h-cold .h-ms { color: var(--azure-light); }
+    .history-item.h-warm .h-ms { color: var(--warm); }
+
+    .history-empty {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 0.5rem;
+    }
+
+    /* Action row */
+    .action-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .action-row .btn { flex: 1; min-width: 140px; }
+
+    /* Error */
+    .error-box {
+      background: rgba(248,81,73,0.1);
+      border: 1px solid rgba(248,81,73,0.3);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--red);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    .hidden { display: none; }
+
+    /* Pulse animation for running state */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    .pulsing { animation: pulse 1.2s ease-in-out infinite; }
+
+    footer {
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+
+    footer a { color: var(--azure-light); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Azure Container Apps Express</div>
+  <h1>⚡ Cold Start Dashboard</h1>
+  <p>Measure real-world cold-start latency for ACA Express instances</p>
+</header>
+
+<!-- URL Input -->
+<div class="card">
+  <div class="card-title">Target URL</div>
+  <div class="url-row">
+    <input
+      type="text"
+      id="urlInput"
+      placeholder="https://your-app.region.azurecontainerapps.io"
+      value=""
+    />
+    <button class="btn btn-secondary" id="clearBtn" title="Clear URL">✕</button>
+  </div>
+</div>
+
+<!-- Timer Card -->
+<div class="card">
+  <div class="card-title">Round-Trip Latency</div>
+  <div class="timer-wrap">
+    <div class="timer-value idle" id="timerDisplay">—</div>
+    <div class="timer-label" id="timerLabel">Ready to fire</div>
+    <div class="status-pill hidden" id="statusPill"></div>
+  </div>
+
+  <div class="breakdown hidden" id="breakdownRow">
+    <div class="breakdown-item">
+      <div class="val" id="bkRtt">—</div>
+      <div class="lbl">Client Round-Trip</div>
+    </div>
+    <div class="breakdown-item">
+      <div class="val" id="bkBoot">—</div>
+      <div class="lbl">Server Boot (bootMs)</div>
+    </div>
+    <div class="breakdown-item">
+      <div class="val" id="bkRouting">—</div>
+      <div class="lbl">ACA Routing Est.</div>
+    </div>
+  </div>
+
+  <div class="error-box hidden" id="errorBox"></div>
+
+  <div class="action-row">
+    <button class="btn btn-primary" id="fireBtn">🚀 Trigger Cold Start</button>
+    <button class="btn btn-secondary hidden" id="warmBtn">🔥 Fire Again (Warm)</button>
+  </div>
+</div>
+
+<!-- Server Details -->
+<div class="card hidden" id="serverCard">
+  <div class="card-title">Server Response</div>
+  <div class="detail-grid">
+    <div class="detail-item"><span class="dk">App Name</span><span class="dv" id="dAppName">—</span></div>
+    <div class="detail-item"><span class="dk">Revision</span><span class="dv" id="dRevision">—</span></div>
+    <div class="detail-item"><span class="dk">Region</span><span class="dv" id="dRegion">—</span></div>
+    <div class="detail-item"><span class="dk">Hostname</span><span class="dv" id="dHostname">—</span></div>
+    <div class="detail-item"><span class="dk">Request Count</span><span class="dv" id="dReqCount">—</span></div>
+    <div class="detail-item"><span class="dk">Server Uptime</span><span class="dv" id="dUptime">—</span></div>
+  </div>
+</div>
+
+<!-- History -->
+<div class="card">
+  <div class="card-title">Request History (last 5)</div>
+  <ul class="history-list" id="historyList">
+    <li class="history-empty">No requests yet — hit Trigger Cold Start to begin</li>
+  </ul>
+</div>
+
+<footer>
+  ACA Express Cold Start Demo &nbsp;·&nbsp;
+  <a href="https://learn.microsoft.com/en-us/azure/container-apps/" target="_blank" rel="noopener">Azure Container Apps Docs</a>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+
+  const urlInput    = $('urlInput');
+  const clearBtn    = $('clearBtn');
+  const fireBtn     = $('fireBtn');
+  const warmBtn     = $('warmBtn');
+  const timerDisplay = $('timerDisplay');
+  const timerLabel  = $('timerLabel');
+  const statusPill  = $('statusPill');
+  const breakdownRow = $('breakdownRow');
+  const bkRtt       = $('bkRtt');
+  const bkBoot      = $('bkBoot');
+  const bkRouting   = $('bkRouting');
+  const errorBox    = $('errorBox');
+  const serverCard  = $('serverCard');
+  const historyList = $('historyList');
+
+  let timerRAF = null;
+  let fetchStart = null;
+  let requestHistory = [];
+  let firstFired = false;
+
+  function fmt(ms) {
+    if (ms === null || ms === undefined) return '—';
+    if (ms < 1000) return ms + 'ms';
+    return (ms / 1000).toFixed(2) + 's';
+  }
+
+  function fmtUptime(ms) {
+    if (ms < 1000) return ms + 'ms';
+    if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+    return Math.floor(ms / 60000) + 'm ' + Math.floor((ms % 60000) / 1000) + 's';
+  }
+
+  function setTimerState(state, valueMs) {
+    timerDisplay.className = 'timer-value ' + state;
+    if (valueMs !== undefined && valueMs !== null) {
+      timerDisplay.textContent = fmt(valueMs);
+    }
+  }
+
+  function startLiveTicker() {
+    if (timerRAF) cancelAnimationFrame(timerRAF);
+    fetchStart = Date.now();
+
+    function tick() {
+      const elapsed = Date.now() - fetchStart;
+      timerDisplay.textContent = elapsed + 'ms';
+      timerRAF = requestAnimationFrame(tick);
+    }
+
+    setTimerState('running');
+    timerDisplay.classList.add('pulsing');
+    timerRAF = requestAnimationFrame(tick);
+  }
+
+  function stopLiveTicker(finalMs) {
+    if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
+    timerDisplay.classList.remove('pulsing');
+  }
+
+  function showStatus(type) {
+    statusPill.classList.remove('hidden', 'cold', 'warm', 'loading');
+    if (type === 'loading') {
+      statusPill.className = 'status-pill loading';
+      statusPill.textContent = '⏳ Waiting for response…';
+    } else if (type === 'cold') {
+      statusPill.className = 'status-pill cold';
+      statusPill.textContent = '⚡ Cold Start (scaled to zero)';
+    } else if (type === 'warm') {
+      statusPill.className = 'status-pill warm';
+      statusPill.textContent = '🔥 Warm (already running)';
+    }
+  }
+
+  function addToHistory(rttMs, isCold, ts) {
+    const entry = { rttMs, isCold, ts };
+    requestHistory.unshift(entry);
+    if (requestHistory.length > 5) requestHistory.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (requestHistory.length === 0) {
+      historyList.innerHTML = '<li class="history-empty">No requests yet — hit Trigger Cold Start to begin</li>';
+      return;
+    }
+    historyList.innerHTML = requestHistory.map(e => {
+      const cls = e.isCold ? 'h-cold' : 'h-warm';
+      const typeLabel = e.isCold ? '⚡ Cold Start' : '🔥 Warm Hit';
+      const timeStr = e.ts.toLocaleTimeString();
+      return `<li class="history-item ${cls}">
+        <span class="h-time">${timeStr}</span>
+        <span class="h-type">${typeLabel}</span>
+        <span class="h-ms">${fmt(e.rttMs)}</span>
+      </li>`;
+    }).join('');
+  }
+
+  function showError(msg) {
+    errorBox.textContent = '⚠️ ' + msg;
+    errorBox.classList.remove('hidden');
+  }
+
+  function hideError() {
+    errorBox.classList.add('hidden');
+  }
+
+  async function doFetch(isColdAttempt) {
+    const url = urlInput.value.trim();
+    if (!url) {
+      showError('Please enter a URL first.');
+      return;
+    }
+
+    // Normalise: strip trailing slash, ensure there's no extra path
+    const base = url.replace(/\/$/, '');
+
+    hideError();
+    fireBtn.disabled = true;
+    warmBtn.classList.add('hidden');
+    serverCard.classList.add('hidden');
+    breakdownRow.classList.add('hidden');
+    timerLabel.textContent = 'Waiting for response…';
+    showStatus('loading');
+
+    startLiveTicker();
+    const t0 = Date.now();
+
+    let data = null;
+    let rttMs = null;
+
+    try {
+      const resp = await fetch(base + '/');
+      rttMs = Date.now() - t0;
+      stopLiveTicker(rttMs);
+
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      data = await resp.json();
+    } catch (err) {
+      rttMs = Date.now() - t0;
+      stopLiveTicker(rttMs);
+      setTimerState('idle');
+      timerDisplay.textContent = '—';
+      timerLabel.textContent = 'Request failed';
+      statusPill.classList.add('hidden');
+      showError(err.message || String(err));
+      fireBtn.disabled = false;
+      if (firstFired) warmBtn.classList.remove('hidden');
+      return;
+    }
+
+    // Determine cold vs warm
+    // Heuristic: if rttMs > 300ms or bootMs > 100ms, it's probably cold
+    const bootMs = data.bootMs || 0;
+    const isCold = rttMs > 300 || bootMs > 100;
+    const state  = isCold ? 'done-cold' : 'done-warm';
+
+    setTimerState(state, rttMs);
+    timerLabel.textContent = isCold
+      ? 'Cold start measured 🧊'
+      : 'Warm response ✅';
+
+    showStatus(isCold ? 'cold' : 'warm');
+
+    // Breakdown
+    const routing = Math.max(0, rttMs - bootMs);
+    bkRtt.textContent     = fmt(rttMs);
+    bkBoot.textContent    = fmt(bootMs);
+    bkRouting.textContent = fmt(routing);
+    breakdownRow.classList.remove('hidden');
+
+    // Server details
+    $('dAppName').textContent  = data.appName  || '—';
+    $('dRevision').textContent = data.revision || '—';
+    $('dRegion').textContent   = data.region   || '—';
+    $('dHostname').textContent = data.hostname || '—';
+    $('dReqCount').textContent = data.requestCount !== undefined ? '#' + data.requestCount : '—';
+    $('dUptime').textContent   = data.uptimeMs !== undefined ? fmtUptime(data.uptimeMs) : '—';
+    serverCard.classList.remove('hidden');
+
+    addToHistory(rttMs, isCold, new Date());
+
+    firstFired = true;
+    fireBtn.disabled = false;
+    fireBtn.textContent = '🚀 Trigger Cold Start';
+    warmBtn.classList.remove('hidden');
+  }
+
+  // Wire up events
+  fireBtn.addEventListener('click', () => doFetch(true));
+  warmBtn.addEventListener('click', () => doFetch(false));
+
+  clearBtn.addEventListener('click', () => {
+    urlInput.value = '';
+    urlInput.focus();
+  });
+
+  urlInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doFetch(true);
+  });
+})();
+</script>
+</body>
+</html>
