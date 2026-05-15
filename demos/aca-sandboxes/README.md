@@ -18,6 +18,47 @@ API keys in agent code / env     →  Platform injects credentials
 
 ---
 
+## About ACA Sandboxes
+
+[ACA Sandboxes](https://github.com/microsoft/azure-container-apps/blob/main/docs/early/sandboxes-overview.md) provide fast, secure, isolated compute environments with built-in suspend and resume capabilities. They are a first-class resource type (`Microsoft.App/SandboxGroups`) in Container Apps, alongside apps, jobs, and dynamic sessions.
+
+Where [Dynamic Sessions](https://learn.microsoft.com/en-us/azure/container-apps/sessions) provide a managed execution experience that abstracts away infrastructure, Sandboxes give you direct, programmable control — including state snapshots, persistent storage, and networking policies.
+
+### Architecture
+
+Sandboxes use a two-plane architecture:
+
+| Plane | Endpoint | Operations |
+|---|---|---|
+| **ARM control plane** | `management.azure.com` | Create/update/delete sandbox groups |
+| **ADC data plane** | `management.azuredevcompute.io` | Manage sandboxes, snapshots, volumes, secrets, egress policies |
+
+### Resource tiers
+
+| Tier | CPU | Memory | Disk |
+|---|---|---|---|
+| XS | 0.25 cores | 0.5 GB | 20 GB |
+| S | 0.5 cores | 1 GB | 20 GB |
+| **M (default)** | 1 core | 2 GB | 20 GB |
+| L | 2 cores | 4 GB | 40 GB |
+
+### Sandbox lifecycle states
+
+`Running` → `Suspended` ↔ `Idle` → `Stopped` → (deleted)
+
+| State | Description |
+|---|---|
+| **Running** | Actively executing |
+| **Suspended** | Full state preserved (memory + disk); sub-second resume |
+| **Idle** | System-suspended; can auto-resume on demand |
+| **Stopped** | User-initiated stop |
+
+> **Early Access:** Resources created during Early Access may not be compatible with future Public Preview releases.
+
+📖 [Sandboxes overview](https://github.com/microsoft/azure-container-apps/blob/main/docs/early/sandboxes-overview.md) · [Dynamic Sessions docs](https://learn.microsoft.com/en-us/azure/container-apps/sessions)
+
+---
+
 ## Setup
 
 ### 1 — Install the `aca` CLI
