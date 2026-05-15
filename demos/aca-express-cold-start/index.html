@@ -185,7 +185,7 @@
     /* Breakdown grid */
     .breakdown {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
       margin-top: 1rem;
     }
@@ -351,17 +351,13 @@
       <div class="val" id="bkBoot">—</div>
       <div class="lbl">Server Boot (bootMs)</div>
     </div>
-    <div class="breakdown-item">
-      <div class="val" id="bkRouting">—</div>
-      <div class="lbl">ACA Routing Est.</div>
-    </div>
   </div>
 
   <div class="error-box hidden" id="errorBox"></div>
 
   <div class="action-row">
     <button class="btn btn-primary" id="fireBtn">🚀 Trigger Cold Start</button>
-    <button class="btn btn-secondary hidden" id="warmBtn">🔥 Fire Again (Warm)</button>
+    <button class="btn btn-secondary" id="resetBtn">🔄 Reset for Cold Start</button>
   </div>
 </div>
 
@@ -372,7 +368,7 @@
     <div class="detail-item"><span class="dk">App Name</span><span class="dv" id="dAppName">—</span></div>
     <div class="detail-item"><span class="dk">Revision</span><span class="dv" id="dRevision">—</span></div>
     <div class="detail-item"><span class="dk">Region</span><span class="dv" id="dRegion">—</span></div>
-    <div class="detail-item"><span class="dk">Hostname</span><span class="dv" id="dHostname">—</span></div>
+    <div class="detail-item"><span class="dk">Replica Name</span><span class="dv" id="dReplicaName">—</span></div>
     <div class="detail-item"><span class="dk">Request Count</span><span class="dv" id="dReqCount">—</span></div>
     <div class="detail-item"><span class="dk">Server Uptime</span><span class="dv" id="dUptime">—</span></div>
   </div>
@@ -400,14 +396,13 @@
   const urlInput    = $('urlInput');
   const clearBtn    = $('clearBtn');
   const fireBtn     = $('fireBtn');
-  const warmBtn     = $('warmBtn');
+  const resetBtn    = $('resetBtn');
   const timerDisplay = $('timerDisplay');
   const timerLabel  = $('timerLabel');
   const statusPill  = $('statusPill');
   const breakdownRow = $('breakdownRow');
   const bkRtt       = $('bkRtt');
   const bkBoot      = $('bkBoot');
-  const bkRouting   = $('bkRouting');
   const errorBox    = $('errorBox');
   const serverCard  = $('serverCard');
   const historyList = $('historyList');
@@ -415,7 +410,6 @@
   let timerRAF = null;
   let fetchStart = null;
   let requestHistory = [];
-  let firstFired = false;
 
   function fmt(ms) {
     if (ms === null || ms === undefined) return '—';
@@ -503,7 +497,7 @@
     errorBox.classList.add('hidden');
   }
 
-  async function doFetch(isColdAttempt) {
+  async function doFetch() {
     const url = urlInput.value.trim();
     if (!url) {
       showError('Please enter a URL first.');
@@ -515,7 +509,7 @@
 
     hideError();
     fireBtn.disabled = true;
-    warmBtn.classList.add('hidden');
+    resetBtn.disabled = true;
     serverCard.classList.add('hidden');
     breakdownRow.classList.add('hidden');
     timerLabel.textContent = 'Waiting for response…';
@@ -543,7 +537,7 @@
       statusPill.classList.add('hidden');
       showError(err.message || String(err));
       fireBtn.disabled = false;
-      if (firstFired) warmBtn.classList.remove('hidden');
+      resetBtn.disabled = false;
       return;
     }
 
@@ -561,32 +555,82 @@
     showStatus(isCold ? 'cold' : 'warm');
 
     // Breakdown
-    const routing = Math.max(0, rttMs - bootMs);
     bkRtt.textContent     = fmt(rttMs);
     bkBoot.textContent    = fmt(bootMs);
-    bkRouting.textContent = fmt(routing);
     breakdownRow.classList.remove('hidden');
 
     // Server details
-    $('dAppName').textContent  = data.appName  || '—';
-    $('dRevision').textContent = data.revision || '—';
-    $('dRegion').textContent   = data.region   || '—';
-    $('dHostname').textContent = data.hostname || '—';
-    $('dReqCount').textContent = data.requestCount !== undefined ? '#' + data.requestCount : '—';
-    $('dUptime').textContent   = data.uptimeMs !== undefined ? fmtUptime(data.uptimeMs) : '—';
+    $('dAppName').textContent     = data.appName     || '—';
+    $('dRevision').textContent    = data.revision    || '—';
+    $('dRegion').textContent      = data.region      || '—';
+    $('dReplicaName').textContent = data.replicaName || '—';
+    $('dReqCount').textContent    = data.requestCount !== undefined ? '#' + data.requestCount : '—';
+    $('dUptime').textContent      = data.uptimeMs !== undefined ? fmtUptime(data.uptimeMs) : '—';
     serverCard.classList.remove('hidden');
 
     addToHistory(rttMs, isCold, new Date());
 
-    firstFired = true;
     fireBtn.disabled = false;
+    resetBtn.disabled = false;
     fireBtn.textContent = '🚀 Trigger Cold Start';
-    warmBtn.classList.remove('hidden');
+  }
+
+  // Reset for cold start: POST /exit then poll until the server stops responding
+  async function doReset() {
+    const url = urlInput.value.trim();
+    if (!url) {
+      showError('Please enter a URL first.');
+      return;
+    }
+    const base = url.replace(/\/$/, '');
+
+    hideError();
+    fireBtn.disabled = true;
+    resetBtn.disabled = true;
+    resetBtn.textContent = '⏳ Resetting…';
+    serverCard.classList.add('hidden');
+    breakdownRow.classList.add('hidden');
+    timerDisplay.textContent = '—';
+    setTimerState('idle');
+    statusPill.classList.add('hidden');
+    timerLabel.textContent = 'Sending shutdown signal…';
+
+    try {
+      await fetch(base + '/exit', { method: 'POST' });
+    } catch (_) {
+      // Expected — the server may close the connection immediately
+    }
+
+    // Poll until server is unreachable (scaled to zero)
+    timerLabel.textContent = 'Waiting for scale-to-zero…';
+    const deadline = Date.now() + 30000;
+    let down = false;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        await fetch(base + '/', { signal: AbortSignal.timeout(2000) });
+      } catch (_) {
+        down = true;
+        break;
+      }
+    }
+
+    if (down) {
+      timerLabel.textContent = 'Scaled to zero ✅ — ready for cold start';
+      showStatus('cold');
+      statusPill.textContent = '🔵 Scaled to zero';
+    } else {
+      timerLabel.textContent = 'Timed out — server may still be running';
+    }
+
+    resetBtn.textContent = '🔄 Reset for Cold Start';
+    fireBtn.disabled = false;
+    resetBtn.disabled = false;
   }
 
   // Wire up events
-  fireBtn.addEventListener('click', () => doFetch(true));
-  warmBtn.addEventListener('click', () => doFetch(false));
+  fireBtn.addEventListener('click', doFetch);
+  resetBtn.addEventListener('click', doReset);
 
   clearBtn.addEventListener('click', () => {
     urlInput.value = '';

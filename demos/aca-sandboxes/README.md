@@ -191,10 +191,18 @@ An exfiltration attempt to `pastebin.com` is blocked and logged in egress decisi
 
 ---
 
+## Tidy up
+
+```bash
+aca sandbox list -o json \
+  | python3 -c "import sys,json; [print(s['id']) for s in json.load(sys.stdin)]" \
+  | xargs -I{} aca sandbox delete --id {} --yes
+```
+
 ## Files
 
 | File | Purpose |
-|---|---|
+| --- | --- |
 | `demo.sh` | Runnable end-to-end demo script |
 | `sandbox.yaml` | Declarative sandbox spec (resources, lifecycle, egress) |
 | `egress-policy.yaml` | Egress policy: deny-by-default + OpenAI key injection |
