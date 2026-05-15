@@ -2,6 +2,27 @@
 
 A minimal demo that measures **real-world cold-start latency** for Azure Container Apps Express instances.
 
+---
+
+## About ACA Express
+
+[Azure Container Apps Express](https://learn.microsoft.com/en-us/azure/container-apps/express-faq) is an environment tier in **Public Preview** that removes infrastructure decisions. There is no environment to provision, no networking to configure, no scaling rules to write — you bring a container image and Express handles everything else.
+
+| Characteristic | Detail |
+|---|---|
+| **Provisioning** | Apps running in seconds, not minutes |
+| **Cold starts** | Sub-second scale-from-zero startup |
+| **Scaling** | Automatic scale-to-zero, up to 2 replicas during preview |
+| **Billing** | Per-second vCPU + memory, same as ACA consumption plan (free grant applies) |
+| **Preview regions** | East Asia · West Central US |
+| **Not yet in preview** | VNet integration, custom domains, managed identity, autoscaling, GPU |
+
+Express is [built on ACA Sandboxes](https://learn.microsoft.com/en-us/azure/container-apps/express-faq#what-is-the-relationship-between-express-and-azure-container-apps-sandboxes) internally — the platform layer that provides fast startup from prewarmed pools.
+
+📖 [Express FAQ](https://learn.microsoft.com/en-us/azure/container-apps/express-faq) · [Announcing ACA Express (blog)](https://techcommunity.microsoft.com/blog/appsonazureblog/introducing-azure-container-apps-express/4519150)
+
+---
+
 ## What this demo shows
 
 Azure Container Apps (ACA) Express can scale to zero when idle. The first request after scale-to-zero incurs a "cold start" — the time for ACA to spin up a new container instance. This demo lets you:
