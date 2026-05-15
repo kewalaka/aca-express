@@ -1,4 +1,4 @@
-disk: ubuntu
+disk: python-3.12
 resources:
   cpu: 1000m
   memory: 2048Mi
