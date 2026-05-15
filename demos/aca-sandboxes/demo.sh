@@ -128,13 +128,28 @@ compare \
   "Install once, snapshot, every agent starts warm in <1 second"
 
 step "Create a fresh sandbox from Ubuntu"
-SANDBOX_ID=$(run aca sandbox apply --file "$(dirname "$0")/sandbox.yaml" -o json | \
-  python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || \
-  aca sandbox create --disk ubuntu -o json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null)
+# Capture stdout separately so pipefail can't kill the script on a bad JSON response
+echo -e "${DIM}$ aca sandbox apply --file ./sandbox.yaml -o json${RESET}" >&2
+_apply_out=$(aca sandbox apply --file "$(dirname "$0")/sandbox.yaml" -o json) || true
+SANDBOX_ID=$(echo "$_apply_out" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || true)
 
-# Fallback: grab ID from plain text output if JSON parse failed
 if [[ -z "$SANDBOX_ID" ]]; then
-  SANDBOX_ID=$(aca sandbox create --disk ubuntu 2>&1 | grep -oE '[0-9a-f-]{36}' | head -1)
+  echo -e "${DIM}$ aca sandbox create --disk ubuntu -o json${RESET}" >&2
+  _create_out=$(aca sandbox create --disk ubuntu -o json) || true
+  SANDBOX_ID=$(echo "$_create_out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null || true)
+fi
+
+# Last resort: regex UUID out of whatever the CLI printed
+if [[ -z "$SANDBOX_ID" ]]; then
+  SANDBOX_ID=$(echo "${_create_out:-$_apply_out}" | grep -oE '[0-9a-f-]{36}' | head -1 || true)
+fi
+
+if [[ -z "$SANDBOX_ID" ]]; then
+  echo -e "${RED}✗  Could not capture sandbox ID.${RESET}" >&2
+  echo "  apply output: ${_apply_out:-<empty>}" >&2
+  echo "  create output: ${_create_out:-<empty>}" >&2
+  echo "  Hint: try 'aca sandbox apply --file sandbox.yaml -o json' manually to diagnose." >&2
+  exit 1
 fi
 
 ok "Sandbox created: $SANDBOX_ID"
@@ -241,9 +256,19 @@ pause
 
 step "Rollback: create a new sandbox from the checkpoint"
 info "In production you'd delete the rogue sandbox and restore the checkpoint."
-RESTORED_ID=$(aca sandbox create --snapshot "$SNAP_WORK" -o json 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null || \
-  aca sandbox create --snapshot "$SNAP_WORK" 2>&1 | grep -oE '[0-9a-f-]{36}' | head -1)
+echo -e "${DIM}$ aca sandbox create --snapshot $SNAP_WORK -o json${RESET}" >&2
+_restore_out=$(aca sandbox create --snapshot "$SNAP_WORK" -o json) || true
+RESTORED_ID=$(echo "$_restore_out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null || true)
+
+if [[ -z "$RESTORED_ID" ]]; then
+  RESTORED_ID=$(echo "$_restore_out" | grep -oE '[0-9a-f-]{36}' | head -1 || true)
+fi
+
+if [[ -z "$RESTORED_ID" ]]; then
+  echo -e "${RED}✗  Could not capture restored sandbox ID.${RESET}" >&2
+  echo "  create output: ${_restore_out:-<empty>}" >&2
+  exit 1
+fi
 
 ok "Restored sandbox: $RESTORED_ID"
 
