@@ -25,12 +25,23 @@ Express is [built on ACA Sandboxes](https://learn.microsoft.com/en-us/azure/cont
 
 ## What this demo shows
 
-Azure Container Apps (ACA) Express can scale to zero when idle. The first request after scale-to-zero incurs a "cold start" — the time for ACA to spin up a new container instance. This demo lets you:
+Azure Container Apps Express scales to zero automatically when idle. The first request after scale-to-zero is a cold start — the time for ACA to spin up a new container instance. This demo lets you:
 
-- Trigger a cold start and see the full round-trip time in real time
-- Break down **client round-trip** vs **server boot time** vs **ACA routing overhead**
-- Compare cold vs warm responses side-by-side
-- Keep a history of the last 5 requests
+- **Trigger Cold Start** — measure the full round-trip time in real time
+- **Reset for Cold Start** — send a shutdown signal to the live container, poll until it goes offline, then you're set up for a genuine cold start on the next trigger
+- **Breakdown** — client round-trip vs server boot time (`bootMs`)
+- **History** — last 5 requests with cold/warm classification
+
+### Watching replicas from the CLI
+
+Run `watch-replicas.sh` in a side terminal for live replica count telemetry:
+
+```bash
+chmod +x watch-replicas.sh
+./watch-replicas.sh <app-name> <resource-group>
+```
+
+You'll see `🔵 Scaled to zero` after a Reset, then `🟢 1 replica running` after the next cold start.
 
 ---
 
@@ -38,9 +49,10 @@ Azure Container Apps (ACA) Express can scale to zero when idle. The first reques
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Minimal Node.js HTTP server (zero npm deps) |
+| `server.js` | Minimal Node.js HTTP server (zero npm deps) — exposes `GET /` and `POST /exit` |
 | `Dockerfile` | Container image definition |
 | `index.html` | Self-contained browser dashboard |
+| `watch-replicas.sh` | CLI replica-count poller (requires `az` CLI) |
 
 ---
 

@@ -16,10 +16,11 @@ const appName = process.env.CONTAINER_APP_NAME || 'aca-demo';
 const revision = process.env.CONTAINER_APP_REVISION || 'local-rev';
 const region = parseRegion(process.env.CONTAINER_APP_ENV_DNS_SUFFIX);
 const hostname = process.env.CONTAINER_APP_HOSTNAME || os.hostname();
+const replicaName = process.env.CONTAINER_APP_REPLICA_NAME || hostname;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -37,6 +38,7 @@ const server = http.createServer((req, res) => {
       revision,
       region,
       hostname,
+      replicaName,
       bootMs: Date.now() - BOOT_TIME,
       requestCount,
       uptimeMs: Math.round(process.uptime() * 1000),
@@ -48,6 +50,21 @@ const server = http.createServer((req, res) => {
       'Content-Length': Buffer.byteLength(body),
     });
     res.end(body);
+    return;
+  }
+
+  // POST /exit — triggers scale-to-zero for demo purposes.
+  // The container exits; ACA Express scales to 0 with no traffic,
+  // so the next request will be a genuine cold start.
+  if (req.method === 'POST' && req.url === '/exit') {
+    const body = JSON.stringify({ message: 'shutting down' });
+    res.writeHead(200, {
+      ...CORS_HEADERS,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    });
+    res.end(body);
+    setTimeout(() => process.exit(0), 200);
     return;
   }
 
