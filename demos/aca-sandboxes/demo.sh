@@ -127,15 +127,15 @@ compare \
   "Every new session reinstalls packages from scratch (30-90s per agent)" \
   "Install once, snapshot, every agent starts warm in <1 second"
 
-step "Create a fresh sandbox from Ubuntu"
+step "Create a fresh sandbox from Python 3.12"
 # Capture stdout separately so pipefail can't kill the script on a bad JSON response
 echo -e "${DIM}$ aca sandbox apply --file ./sandbox.yaml -o json${RESET}" >&2
 _apply_out=$(aca sandbox apply --file "$(dirname "$0")/sandbox.yaml" -o json) || true
 SANDBOX_ID=$(echo "$_apply_out" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || true)
 
 if [[ -z "$SANDBOX_ID" ]]; then
-  echo -e "${DIM}$ aca sandbox create --disk ubuntu -o json${RESET}" >&2
-  _create_out=$(aca sandbox create --disk ubuntu -o json) || true
+  echo -e "${DIM}$ aca sandbox create --disk python-3.12 -o json${RESET}" >&2
+  _create_out=$(aca sandbox create --disk python-3.12 -o json) || true
   SANDBOX_ID=$(echo "$_create_out" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id', d.get('sandboxId','')))" 2>/dev/null || true)
 fi
 
